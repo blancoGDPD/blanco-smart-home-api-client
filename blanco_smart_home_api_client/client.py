@@ -163,12 +163,16 @@ class BlancoApiClient:
                 timeout=aiohttp.ClientTimeout(total=30),
             ) as resp:
                 body = await resp.json(content_type=None)
-                blanco_log(_LOGGER, BlancoLogLevel.DEBUG, "POST %s → %s", url, resp.status)
+                blanco_log(
+                    _LOGGER, BlancoLogLevel.DEBUG, "POST %s → %s", url, resp.status
+                )
                 blanco_log(_LOGGER, BlancoLogLevel.TRACE, "  response=%s", body)
                 if resp.status != HttpStatus.OK:
                     blanco_log(
-                        _LOGGER, BlancoLogLevel.WARNING,
-                        "App registration failed: HTTP %s", resp.status,
+                        _LOGGER,
+                        BlancoLogLevel.WARNING,
+                        "App registration failed: HTTP %s",
+                        resp.status,
                     )
                     raise BlancoConnectionError(
                         f"App registration failed: HTTP {resp.status}"
@@ -176,15 +180,14 @@ class BlancoApiClient:
         except BlancoConnectionError:
             raise
         except aiohttp.ClientError as err:
-            blanco_log(_LOGGER, BlancoLogLevel.WARNING,
-                       "POST %s → ClientError: %s", url, err)
+            blanco_log(
+                _LOGGER, BlancoLogLevel.WARNING, "POST %s → ClientError: %s", url, err
+            )
             raise BlancoConnectionError(f"App registration failed: {err}") from err
 
         app_id = (body.get("results") or [{}])[0].get("app_id")
         if not app_id:
-            raise BlancoConnectionError(
-                "App registration response contained no app_id"
-            )
+            raise BlancoConnectionError("App registration response contained no app_id")
         self.update_app_id(str(app_id))
         return AppRegistrationResult(app_id=str(app_id))
 
@@ -210,16 +213,21 @@ class BlancoApiClient:
                 json=payload,
                 timeout=aiohttp.ClientTimeout(total=30),
             ) as resp:
-                blanco_log(_LOGGER, BlancoLogLevel.DEBUG, "PUT %s → %s", url, resp.status)
+                blanco_log(
+                    _LOGGER, BlancoLogLevel.DEBUG, "PUT %s → %s", url, resp.status
+                )
                 if resp.status != HttpStatus.OK:
                     blanco_log(
-                        _LOGGER, BlancoLogLevel.WARNING,
-                        "Failed to update app locale: HTTP %s", resp.status,
+                        _LOGGER,
+                        BlancoLogLevel.WARNING,
+                        "Failed to update app locale: HTTP %s",
+                        resp.status,
                     )
                     return False
         except aiohttp.ClientError as err:
-            blanco_log(_LOGGER, BlancoLogLevel.WARNING,
-                       "PUT %s → ClientError: %s", url, err)
+            blanco_log(
+                _LOGGER, BlancoLogLevel.WARNING, "PUT %s → ClientError: %s", url, err
+            )
             raise BlancoConnectionError(f"Locale update failed: {err}") from err
         return True
 
@@ -241,15 +249,20 @@ class BlancoApiClient:
                 headers=headers,
                 timeout=aiohttp.ClientTimeout(total=30),
             ) as resp:
-                blanco_log(_LOGGER, BlancoLogLevel.DEBUG, "DELETE %s → %s", url, resp.status)
+                blanco_log(
+                    _LOGGER, BlancoLogLevel.DEBUG, "DELETE %s → %s", url, resp.status
+                )
                 if resp.status != HttpStatus.OK:
                     blanco_log(
-                        _LOGGER, BlancoLogLevel.WARNING,
-                        "App deregistration failed: HTTP %s", resp.status,
+                        _LOGGER,
+                        BlancoLogLevel.WARNING,
+                        "App deregistration failed: HTTP %s",
+                        resp.status,
                     )
         except aiohttp.ClientError as err:
-            blanco_log(_LOGGER, BlancoLogLevel.WARNING,
-                       "DELETE %s → ClientError: %s", url, err)
+            blanco_log(
+                _LOGGER, BlancoLogLevel.WARNING, "DELETE %s → ClientError: %s", url, err
+            )
             raise BlancoConnectionError(f"App deregistration failed: {err}") from err
 
     # ── Authentication ────────────────────────────────────────────────────────
@@ -280,9 +293,15 @@ class BlancoApiClient:
                 timeout=aiohttp.ClientTimeout(total=30),
             ) as resp:
                 body = await resp.json(content_type=None)
-                blanco_log(_LOGGER, BlancoLogLevel.DEBUG, "POST %s → %s", url, resp.status)
-                blanco_log(_LOGGER, BlancoLogLevel.TRACE,
-                           "  response=%s", mask_response_body(body))
+                blanco_log(
+                    _LOGGER, BlancoLogLevel.DEBUG, "POST %s → %s", url, resp.status
+                )
+                blanco_log(
+                    _LOGGER,
+                    BlancoLogLevel.TRACE,
+                    "  response=%s",
+                    mask_response_body(body),
+                )
                 if resp.status != HttpStatus.OK:
                     error_codes = [
                         e.get("code") for e in (body or {}).get("errors", [])
@@ -299,16 +318,15 @@ class BlancoApiClient:
         except BlancoApiError:
             raise
         except aiohttp.ClientError as err:
-            blanco_log(_LOGGER, BlancoLogLevel.WARNING,
-                       "POST %s → ClientError: %s", url, err)
+            blanco_log(
+                _LOGGER, BlancoLogLevel.WARNING, "POST %s → ClientError: %s", url, err
+            )
             raise BlancoConnectionError(f"Authentication failed: {err}") from err
 
         result = (body.get("results") or [{}])[0]
         token = result.get("token")
         if not token:
-            raise BlancoInvalidTokenError(
-                "Authentication response contained no token"
-            )
+            raise BlancoInvalidTokenError("Authentication response contained no token")
         self.update_authorization(str(token), str(result.get("token_type", "Bearer")))
         return AuthResult(
             token=str(token),
@@ -348,8 +366,13 @@ class BlancoApiClient:
                 timeout=aiohttp.ClientTimeout(total=30),
             ) as resp:
                 body = await resp.json(content_type=None)
-                blanco_log(_LOGGER, BlancoLogLevel.DEBUG,
-                           "GET %s → %s", masked_url, resp.status)
+                blanco_log(
+                    _LOGGER,
+                    BlancoLogLevel.DEBUG,
+                    "GET %s → %s",
+                    masked_url,
+                    resp.status,
+                )
                 blanco_log(_LOGGER, BlancoLogLevel.TRACE, "  response=%s", body)
                 if resp.status == HttpStatus.UNAUTHORIZED:
                     raise BlancoTokenExpiredError(
@@ -359,37 +382,34 @@ class BlancoApiClient:
         except BlancoTokenExpiredError:
             raise
         except aiohttp.ClientError as err:
-            blanco_log(_LOGGER, BlancoLogLevel.WARNING,
-                       "GET %s → ClientError: %s", masked_url, err)
+            blanco_log(
+                _LOGGER,
+                BlancoLogLevel.WARNING,
+                "GET %s → ClientError: %s",
+                masked_url,
+                err,
+            )
             raise BlancoConnectionError(f"GET {masked_url} failed: {err}") from err
 
-    async def get_device_system(
-        self, dev_id: str
-    ) -> tuple[int, DeviceEventResult]:
+    async def get_device_system(self, dev_id: str) -> tuple[int, DeviceEventResult]:
         """GET /devices/{dev_id}/system — return (status_code, DeviceEventResult)."""
         url = f"{API_BASE_URL}{API_DEVICES_ENDPOINT}/{dev_id}/system"
         status, body = await self._get_device_endpoint(url, dev_id)
         return status, _parse_event(body)
 
-    async def get_device_status(
-        self, dev_id: str
-    ) -> tuple[int, DeviceEventResult]:
+    async def get_device_status(self, dev_id: str) -> tuple[int, DeviceEventResult]:
         """GET /devices/{dev_id}/status — return (status_code, DeviceEventResult)."""
         url = f"{API_BASE_URL}{API_DEVICES_ENDPOINT}/{dev_id}/status"
         status, body = await self._get_device_endpoint(url, dev_id)
         return status, _parse_event(body)
 
-    async def get_device_settings(
-        self, dev_id: str
-    ) -> tuple[int, DeviceEventResult]:
+    async def get_device_settings(self, dev_id: str) -> tuple[int, DeviceEventResult]:
         """GET /devices/{dev_id}/settings — return (status_code, DeviceEventResult)."""
         url = f"{API_BASE_URL}{API_DEVICES_ENDPOINT}/{dev_id}/settings"
         status, body = await self._get_device_endpoint(url, dev_id)
         return status, _parse_event(body)
 
-    async def get_device_errors(
-        self, dev_id: str
-    ) -> tuple[int, DeviceErrorsResult]:
+    async def get_device_errors(self, dev_id: str) -> tuple[int, DeviceErrorsResult]:
         """GET /devices/{dev_id}/errors — return (status_code, DeviceErrorsResult)."""
         url = f"{API_BASE_URL}{API_DEVICES_ENDPOINT}/{dev_id}/errors"
         status, body = await self._get_device_endpoint(url, dev_id)
@@ -448,8 +468,13 @@ class BlancoApiClient:
                 timeout=aiohttp.ClientTimeout(total=30),
             ) as resp:
                 body = await resp.json(content_type=None)
-                blanco_log(_LOGGER, BlancoLogLevel.DEBUG,
-                           "POST %s → %s", masked_url, resp.status)
+                blanco_log(
+                    _LOGGER,
+                    BlancoLogLevel.DEBUG,
+                    "POST %s → %s",
+                    masked_url,
+                    resp.status,
+                )
                 blanco_log(_LOGGER, BlancoLogLevel.TRACE, "  response=%s", body)
                 if resp.status == HttpStatus.UNAUTHORIZED:
                     raise BlancoTokenExpiredError(
@@ -459,6 +484,11 @@ class BlancoApiClient:
         except BlancoTokenExpiredError:
             raise
         except aiohttp.ClientError as err:
-            blanco_log(_LOGGER, BlancoLogLevel.WARNING,
-                       "POST %s → ClientError: %s", masked_url, err)
+            blanco_log(
+                _LOGGER,
+                BlancoLogLevel.WARNING,
+                "POST %s → ClientError: %s",
+                masked_url,
+                err,
+            )
             raise BlancoConnectionError(f"POST {masked_url} failed: {err}") from err
