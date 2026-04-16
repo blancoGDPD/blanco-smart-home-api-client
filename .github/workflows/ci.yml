@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-and-type-check:
+    name: Lint & type check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff mypy aiohttp
+
+      - name: ruff check
+        run: ruff check blanco_smart_home_api_client/
+
+      - name: ruff format
+        run: ruff format --check blanco_smart_home_api_client/
+
+      - name: mypy
+        run: mypy blanco_smart_home_api_client/
