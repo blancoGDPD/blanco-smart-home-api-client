@@ -24,10 +24,21 @@ class BlancoLogLevel(IntEnum):
 
 
 # ---------------------------------------------------------------
-# Central log-level setting — change this value during development
+# Central log-level setting — raise to TRACE during development
+# to see request headers, payloads, and response bodies.
 # ---------------------------------------------------------------
 LOG_LEVEL: BlancoLogLevel = BlancoLogLevel.DEBUG
-"""Active log verbosity level. Set to NONE in production to silence all client logs."""
+"""Active log verbosity level for the BLANCO API client.
+
+At the default level (DEBUG), all request/response lines (method, URL, status
+code) are emitted via Python's standard logging infrastructure.  The caller
+controls what actually appears by configuring the ``blanco_smart_home_api_client``
+logger (e.g. setting its level to WARNING suppresses DEBUG output).
+
+Raise to TRACE to also log full request headers, payloads, and response bodies —
+useful during development but not recommended in production as it exposes
+sensitive values such as API keys and bearer tokens.
+"""
 
 
 def blanco_log(

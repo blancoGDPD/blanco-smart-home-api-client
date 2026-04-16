@@ -11,7 +11,9 @@ from typing import Any
 
 # ── HTTP headers ───────────────────────────────────────────────────────────────
 
-_SENSITIVE_HEADERS: frozenset[str] = frozenset({"Authorization", "X-Api-Key", "X-App-Id"})
+_SENSITIVE_HEADERS: frozenset[str] = frozenset(
+    {"Authorization", "X-Api-Key", "X-App-Id"}
+)
 # Header names whose values are truncated before logging.
 
 _HEADER_MASK_LENGTH = 20
@@ -26,7 +28,9 @@ def mask_headers(headers: dict[str, str]) -> dict[str, str]:
     ``...`` when their value exceeds that length.
     """
     return {
-        k: (v[:_HEADER_MASK_LENGTH] + "...") if k in _SENSITIVE_HEADERS and len(v) > _HEADER_MASK_LENGTH else v
+        k: (v[:_HEADER_MASK_LENGTH] + "...")
+        if k in _SENSITIVE_HEADERS and len(v) > _HEADER_MASK_LENGTH
+        else v
         for k, v in headers.items()
     }
 

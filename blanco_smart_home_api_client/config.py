@@ -26,15 +26,15 @@ class BlancoApiStage(Enum):
 # Maps each BlancoApiStage to its corresponding API key and base URL.
 _STAGE_CONFIG: dict[BlancoApiStage, dict[str, str]] = {
     BlancoApiStage.DEFAULT: {
-        "api_key":      "u8GGIsN64z1WaQId9n2Qu3XITlXTnomx78p0fKAu",
+        "api_key": "u8GGIsN64z1WaQId9n2Qu3XITlXTnomx78p0fKAu",
         "api_base_url": "https://smart-home-api.prod.ddi-backend.blanco.com",
     },
     BlancoApiStage.PROD: {
-        "api_key":      "u8GGIsN64z1WaQId9n2Qu3XITlXTnomx78p0fKAu",
+        "api_key": "u8GGIsN64z1WaQId9n2Qu3XITlXTnomx78p0fKAu",
         "api_base_url": "https://smart-home-api.prod.ddi-backend.blanco.com",
     },
     BlancoApiStage.DEV: {
-        "api_key":      "SxvZiPiH6s9AAWgY7nfy87tDOk5o51wM6QcLDhn7",
+        "api_key": "SxvZiPiH6s9AAWgY7nfy87tDOk5o51wM6QcLDhn7",
         "api_base_url": "https://smart-home-api.dev.ddi-backend.blanco.com",
     },
 }
