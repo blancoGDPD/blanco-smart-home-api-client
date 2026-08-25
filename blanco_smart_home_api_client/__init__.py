@@ -28,7 +28,13 @@ from .errors import (
 )
 from .http_status import HttpStatus
 from .log import BlancoLogLevel, blanco_log
-from .models import BlancoActionType, BlancoErrorType, BlancoWaterType
+from .models import (
+    BLANCO_DEVICE_NAMES,
+    BlancoActionType,
+    BlancoDeviceType,
+    BlancoErrorType,
+    BlancoWaterType,
+)
 from .results import (
     AppRegistrationResult,
     AuthResult,
@@ -59,7 +65,9 @@ __all__ = [
     "BlancoLogLevel",
     "blanco_log",
     # Models
+    "BLANCO_DEVICE_NAMES",
     "BlancoActionType",
+    "BlancoDeviceType",
     "BlancoErrorType",
     "BlancoWaterType",
     # Results

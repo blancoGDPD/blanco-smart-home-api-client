@@ -1,12 +1,54 @@
 """Domain-model enums for the BLANCO Smart Home API client.
 
-Defines the API-side enums shared across all library modules:
+Defines the API-side enums shared across all library modules: device types,
 error severity levels, action types, and water dispense types.
 """
 
 from __future__ import annotations
 
 from enum import IntEnum
+
+
+class BlancoDeviceType(IntEnum):
+    """Device types returned in the dev_type field by /auth/token and device data endpoints."""
+
+    UNDEF = 0
+    """Unknown or unrecognised device type — used as a safe fallback."""
+    SODA = 1
+    """EVOL-S PRO — sparkling/still water dispenser with CO₂."""
+    AIO = 2
+    """CHOICE.ALL — all-in-one dispenser with hot, cold, and sparkling water."""
+    SODA2 = 3
+    """CHOICE.Soda — sparkling/still water dispenser."""
+    FILTER = 4
+    """CHOICE.Filter — filtered cold water dispenser."""
+    HOT = 5
+    """CHOICE.Hot — hot water dispenser."""
+    SELECT = 6
+    """SELECT II — multi-function water dispenser."""
+    FLEXON = 7
+    """FLEXON II — flexible water dispenser."""
+    SEPURA = 8
+    """SEPURA — water dispenser with filtration."""
+    AQUA = 9
+    """AQUA — filtration unit with volume- and time-based filter tracking."""
+    BIOSORT = 10
+    """BIOSORT — biological filtration system."""
+
+
+BLANCO_DEVICE_NAMES: dict[BlancoDeviceType, str] = {
+    BlancoDeviceType.SODA: "EVOL-S PRO",
+    BlancoDeviceType.AIO: "CHOICE.ALL",
+    BlancoDeviceType.SODA2: "CHOICE.Soda",
+    BlancoDeviceType.FILTER: "CHOICE.Filter",
+    BlancoDeviceType.HOT: "CHOICE.Hot",
+    BlancoDeviceType.SELECT: "SELECT II",
+    BlancoDeviceType.FLEXON: "FLEXON II",
+    BlancoDeviceType.SEPURA: "SEPURA",
+    BlancoDeviceType.AQUA: "AQUA",
+    BlancoDeviceType.BIOSORT: "BIOSORT",
+}
+"""Marketing device names shown as the HA device model, keyed by BlancoDeviceType."""
 
 
 class BlancoErrorType(IntEnum):
