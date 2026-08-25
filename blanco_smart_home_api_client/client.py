@@ -2,7 +2,13 @@
 
 from __future__ import annotations
 
+import base64
+from collections.abc import Callable
+import hashlib
+import json
 import logging
+import math
+import time
 from typing import Any
 
 import aiohttp
@@ -41,6 +47,26 @@ from .mask import mask_dev_id, mask_headers, mask_response_body
 
 _LOGGER = logging.getLogger(__name__)
 
+
+def _jwt_expires_at(token: str) -> float:
+    """Return the exp claim from a JWT as a Unix timestamp.
+
+    Returns float("inf") when the token cannot be decoded as a JWT, which
+    disables proactive renewal and lets the reactive BlancoTokenExpiredError
+    path act as the fallback.
+    """
+    parts = token.split(".")
+    if len(parts) < 2:
+        return math.inf
+    try:
+        # Restore base64url padding that is stripped during JWT encoding.
+        payload_b64 = parts[1] + "=" * (-len(parts[1]) % 4)
+        payload = json.loads(base64.urlsafe_b64decode(payload_b64))
+        return float(payload.get("exp", math.inf))
+    except ValueError:
+        return math.inf
+
+
 # ── Re-exports (allow callers to import errors from this module) ───────────────
 
 __all__ = [
@@ -73,17 +99,30 @@ class BlancoApiClient:
     parameters automatically.  Sensitive values (Authorization, X-Api-Key,
     X-App-Id, dev_id) are masked in log output.
 
+    Device data requests (``get_device_*``, ``get_device_stats``) transparently
+    keep the auth token fresh: the JWT's ``exp`` claim is checked before every
+    request and proactively renewed if it has passed, with a reactive
+    renew-and-retry-once fallback if the server still returns HTTP 401. Pass
+    *dev_id* and *on_token_renewed* to enable this — without them (e.g. during
+    the initial pairing flow, before a dev_id exists yet) device data methods
+    are simply not called.
+
     Args:
         session: Shared aiohttp client session managed by the caller.
         app_id: App identifier issued by POST /apps/registrations.
         token: Bearer token issued by POST /auth/token.
         token_type: Token type string (default: ``"Bearer"``).
+        dev_id: Device identifier used to renew the token when it expires.
+            Required for the automatic renewal described above.
         app_version: Integration or application version string sent in
             ``X-App-Version`` (e.g. ``"1.0.0"``).
         app_build: Integration or application build number sent in
             ``X-App-Build`` (e.g. ``"1"``).
         os_version: Host OS / platform version sent in ``X-OS-Version``
             (e.g. the Home Assistant version string).
+        on_token_renewed: Called with ``(token, token_type)`` right after a
+            successful automatic renewal, so the caller can persist the new
+            credentials (e.g. into a Home Assistant config entry).
     """
 
     def __init__(
@@ -93,15 +132,19 @@ class BlancoApiClient:
         app_id: str = "",
         token: str = "",
         token_type: str = "Bearer",
+        dev_id: str = "",
         app_version: str = "",
         app_build: str = "",
         os_version: str = "",
+        on_token_renewed: Callable[[str, str], None] | None = None,
     ) -> None:
         """Initialise the client with a shared aiohttp session and optional credentials."""
         self._session = session
         self._app_id = app_id
         self._token = token
         self._token_type = token_type
+        self._dev_id = dev_id
+        self._on_token_renewed = on_token_renewed
         # Build static headers once per instance from the provided metadata.
         self._static_headers: dict[str, str] = {
             "User-Agent": "ha-blanco",
@@ -119,6 +162,44 @@ class BlancoApiClient:
     def update_app_id(self, app_id: str) -> None:
         """Update the stored app ID (called after successful app registration)."""
         self._app_id = app_id
+
+    @staticmethod
+    def compute_dev_id(serial: str, service_code: str) -> str:
+        """Derive the API dev_id from a device serial number and service code.
+
+        Length-prefixes *serial* before concatenation so that, e.g.,
+        ``("A", "12")`` and ``("A1", "2")`` do not hash to the same dev_id.
+        """
+        canonical = f"{len(serial)}:{serial}{service_code}"
+        return hashlib.sha256(canonical.encode()).hexdigest()
+
+    async def _ensure_token_fresh(self) -> None:
+        """Proactively renew the auth token if its JWT exp claim has passed.
+
+        No-op when the token cannot be decoded as a JWT or dev_id was not
+        provided at construction time — the reactive retry in
+        _get_device_endpoint / get_device_stats remains the fallback.
+
+        Raises:
+            BlancoApiError: Renewal was attempted and failed.
+        """
+        if not self._dev_id:
+            return
+        if _jwt_expires_at(self._token) <= time.time():
+            blanco_log(
+                _LOGGER, BlancoLogLevel.DEBUG, "Token expired, proactively renewing"
+            )
+            await self._renew_and_notify()
+
+    async def _renew_and_notify(self) -> None:
+        """Renew the auth token via /auth/token and notify on_token_renewed.
+
+        Raises:
+            BlancoApiError: Any subclass raised by authenticate().
+        """
+        result = await self.authenticate(self._dev_id)
+        if self._on_token_renewed is not None:
+            self._on_token_renewed(result["token"], result["token_type"])
 
     # ── Internal header builders ──────────────────────────────────────────────
 
@@ -349,6 +430,31 @@ class BlancoApiClient:
     async def _get_device_endpoint(
         self, url: str, dev_id: str
     ) -> tuple[int, dict[str, Any]]:
+        """GET *url* using full auth headers, transparently renewing an expired token.
+
+        Raises:
+            BlancoApiError: Token renewal was attempted (proactively or after
+                a 401) and failed — the caller should treat this as a
+                permanent auth failure, not a transient one.
+            BlancoConnectionError: Network failure making the GET request.
+        """
+        await self._ensure_token_fresh()
+        try:
+            return await self._request_device_endpoint(url, dev_id)
+        except BlancoTokenExpiredError:
+            if not self._dev_id:
+                raise
+            blanco_log(
+                _LOGGER,
+                BlancoLogLevel.WARNING,
+                "Token expired mid-request, renewing and retrying",
+            )
+            await self._renew_and_notify()
+            return await self._request_device_endpoint(url, dev_id)
+
+    async def _request_device_endpoint(
+        self, url: str, dev_id: str
+    ) -> tuple[int, dict[str, Any]]:
         """GET *url* using full auth headers; return (status_code, body).
 
         Raises:
@@ -445,9 +551,37 @@ class BlancoApiClient:
     ) -> tuple[int, DeviceStatsResult]:
         """POST /devices/{dev_id}/stats — fetch aggregated water statistics.
 
+        Transparently renews an expired token, proactively and reactively,
+        the same way _get_device_endpoint does.
+
         Args:
             dev_id: Device identifier.
             ranges: List of time-range descriptors specifying the periods to aggregate.
+
+        Raises:
+            BlancoApiError: Token renewal was attempted and failed.
+            BlancoConnectionError: Network failure.
+        """
+        await self._ensure_token_fresh()
+        try:
+            return await self._post_device_stats(dev_id, ranges)
+        except BlancoTokenExpiredError:
+            if not self._dev_id:
+                raise
+            blanco_log(
+                _LOGGER,
+                BlancoLogLevel.WARNING,
+                "Token expired mid-request, renewing and retrying",
+            )
+            await self._renew_and_notify()
+            return await self._post_device_stats(dev_id, ranges)
+
+    async def _post_device_stats(
+        self,
+        dev_id: str,
+        ranges: list[dict[str, Any]],
+    ) -> tuple[int, DeviceStatsResult]:
+        """POST /devices/{dev_id}/stats; return (status_code, DeviceStatsResult).
 
         Raises:
             BlancoTokenExpiredError: HTTP 401 response (token needs renewal).
