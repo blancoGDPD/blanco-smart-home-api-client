@@ -167,10 +167,13 @@ class BlancoApiClient:
     def compute_dev_id(serial: str, service_code: str) -> str:
         """Derive the API dev_id from a device serial number and service code.
 
-        Length-prefixes *serial* before concatenation so that, e.g.,
-        ``("A", "12")`` and ``("A1", "2")`` do not hash to the same dev_id.
+        This is a fixed BLANCO format, not something this client can change: the BLANCO
+        Cloud and the BLANCO UNIT app compute the same value the same way, and a device's
+        pairing (granted via Bluetooth in the UNIT app) is tied to it. Using a different
+        formula here — even a technically improved one — would produce a dev_id the Cloud
+        doesn't recognize, breaking pairing for every existing device.
         """
-        canonical = f"{len(serial)}:{serial}{service_code}"
+        canonical = serial + service_code
         return hashlib.sha256(canonical.encode()).hexdigest()
 
     async def _ensure_token_fresh(self) -> None:

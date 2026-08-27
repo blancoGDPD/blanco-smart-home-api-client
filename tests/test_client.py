@@ -71,18 +71,26 @@ class TestComputeDevId:
             "SN123", "CODE456"
         ) == BlancoApiClient.compute_dev_id("SN123", "CODE456")
 
-    def test_different_boundary_split_produces_different_ids(self) -> None:
-        """("A", "12") and ("A1", "2") must not collide despite the same concatenation."""
-        assert BlancoApiClient.compute_dev_id(
-            "A", "12"
-        ) != BlancoApiClient.compute_dev_id("A1", "2")
+    def test_matches_plain_concatenated_sha256(self) -> None:
+        """The digest is sha256 of the plain, undelimited "{serial}{service_code}".
 
-    def test_matches_length_prefixed_sha256(self) -> None:
-        """The digest is sha256 of "{len(serial)}:{serial}{service_code}"."""
+        Must match what BLANCO Cloud/the UNIT app derive for the same pair — see the
+        docstring on compute_dev_id for why this is not free to change to a delimited
+        (collision-safe) form despite this codebase's general canonical-form rule.
+        """
         import hashlib
 
-        expected = hashlib.sha256(b"5:SN123CODE456").hexdigest()
+        expected = hashlib.sha256(b"SN123CODE456").hexdigest()
         assert BlancoApiClient.compute_dev_id("SN123", "CODE456") == expected
+
+    def test_boundary_split_collides_by_design(self) -> None:
+        """("A", "12") and ("A1", "2") DO collide — matches BLANCO's own derivation.
+
+        This is the accepted trade-off documented on compute_dev_id, not an oversight.
+        """
+        assert BlancoApiClient.compute_dev_id(
+            "A", "12"
+        ) == BlancoApiClient.compute_dev_id("A1", "2")
 
 
 # ── _jwt_expires_at ──────────────────────────────────────────────────────────
