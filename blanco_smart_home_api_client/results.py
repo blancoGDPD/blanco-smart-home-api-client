@@ -10,7 +10,6 @@ from typing import Any, TypedDict
 
 from .models import BlancoActionType, BlancoErrorType, BlancoWaterType
 
-
 # ── Result types ──────────────────────────────────────────────────────────────
 
 
